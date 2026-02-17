@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧧 新年禮物追蹤</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #fdf2f2; font-family: 'Segoe UI', sans-serif; }
+        .timeline { border-left: 3px solid #dc3545; padding-left: 20px; margin-top: 20px; }
+        .timeline-item { margin-bottom: 20px; position: relative; }
+        .timeline-item::before { content: '🎁'; position: absolute; left: -34px; top: 0px; background: #fff; border-radius: 50%; }
+        .signature-box { border: 2px dashed #dc3545; padding: 10px; background: white; transform: rotate(-2deg); margin-top: 15px;}
+        .signature-img { width: 100%; max-width: 200px; }
+    </style>
+</head>
+<body class="container py-5">
+    <div class="card shadow border-0">
+        <div class="card-header bg-danger text-white text-center py-3">
+            <h2 class="mb-0">🧧 新年快遞查詢</h2>
+        </div>
+        <div class="card-body p-4">
+            <div class="input-group mb-3">
+                <input type="text" id="trackId" class="form-control form-control-lg" placeholder="輸入單號 (例: NY-001)">
+                <button class="btn btn-dark" onclick="track()">🔍 查詢</button>
+            </div>
+
+            <div id="result" class="d-none">
+                <div class="alert alert-warning d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>狀態：</strong> <span id="statusText" class="fs-5 fw-bold"></span>
+                    </div>
+                    <span id="location" class="badge bg-danger"></span>
+                </div>
+                <p class="fs-5">收件人：<span id="recipient" class="fw-bold"></span></p>
+
+                <div id="sigSection" class="d-none text-center">
+                    <div class="signature-box">
+                        <p class="text-muted mb-1"><small>已由本人親自簽收</small></p>
+                        <img id="sigImg" class="signature-img">
+                    </div>
+                </div>
+
+                <h5 class="mt-4 border-bottom pb-2">📦 運送歷程</h5>
+                <div class="timeline" id="history"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 允許網址帶入參數自動查詢
+        const urlParams = new URLSearchParams(window.location.search);
+        if(urlParams.get('id')) {
+            document.getElementById('trackId').value = urlParams.get('id');
+            track();
+        }
+
+        async function track() {
+            const id = document.getElementById('trackId').value.trim();
+            if(!id) return alert("請輸入單號");
+            
+            try {
+                const res = await fetch(`/api/track?id=${id}`);
+                if (!res.ok) throw new Error();
+                const data = await res.json();
+
+                document.getElementById('result').classList.remove('d-none');
+                document.getElementById('statusText').innerText = data.status;
+                document.getElementById('recipient').innerText = data.recipient;
+                document.getElementById('location').innerText = data.location;
+
+                // 歷程渲染
+                let html = '';
+                data.history.reverse().forEach(h => {
+                    html += `<div class="timeline-item">
+                        <div class="fw-bold text-danger">${h.status}</div>
+                        <div class="text-muted small">${h.time}</div>
+                        <div>${h.location}</div>
+                    </div>`;
+                });
+                document.getElementById('history').innerHTML = html;
+
+                // 簽名顯示
+                if (data.signature) {
+                    document.getElementById('sigSection').classList.remove('d-none');
+                    document.getElementById('sigImg').src = data.signature;
+                } else {
+                    document.getElementById('sigSection').classList.add('d-none');
+                }
+            } catch (e) {
+                alert('查無此單號，是不是還在準備中？');
+            }
+        }
+    </script>
+</body>
+</html>
