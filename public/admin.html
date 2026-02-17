@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>後台 - 建立訂單</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="container py-5">
+    <h1>🛠️ 建立新快遞單</h1>
+    <hr>
+    <div class="mb-3">
+        <label>單號 (ID)</label>
+        <input type="text" id="newId" class="form-control" placeholder="例: NY-001">
+    </div>
+    <div class="mb-3">
+        <label>收件人姓名</label>
+        <input type="text" id="recipient" class="form-control" placeholder="例: 親愛的媽媽">
+    </div>
+    <button onclick="create()" class="btn btn-primary">建立並儲存</button>
+
+    <script>
+        async function create() {
+            const id = document.getElementById('newId').value;
+            const recipient = document.getElementById('recipient').value;
+            
+            const res = await fetch('/api/track', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ action: 'create', id, recipient })
+            });
+            const data = await res.json();
+            if(data.success) {
+                alert("建立成功！");
+                document.getElementById('newId').value = '';
+                document.getElementById('recipient').value = '';
+            } else {
+                alert("失敗: " + data.error);
+            }
+        }
+    </script>
+</body>
+</html>
