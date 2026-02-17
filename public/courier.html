@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>派送員終端</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
+    <style>canvas { border: 2px dashed #999; background: #fff; width: 100%; height: 250px; border-radius: 8px; }</style>
+</head>
+<body class="bg-dark text-white container py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">🚚 派送員系統</h4>
+        <span id="displayId" class="badge bg-warning text-dark"></span>
+    </div>
+
+    <div class="card text-dark mb-3">
+        <div class="card-body">
+            <h5 class="card-title" id="recipientName">載入中...</h5>
+            <p class="card-text">目前狀態：<span id="currentStatus" class="fw-bold text-danger">--</span></p>
+        </div>
+    </div>
+
+    <div id="menuMode">
+        <button onclick="showUpdate()" class="btn btn-outline-light w-100 py-3 mb-3 fw-bold">📍 更新物流位置</button>
+        <button onclick="showSign()" class="btn btn-danger w-100 py-3 fw-bold">✍️ 客戶簽收</button>
+        <a href="/index.html" class="btn btn-link text-white-50 w-100 mt-2">回首頁</a>
+    </div>
+
+    <div id="updateMode" class="d-none">
+        <h5 class="mb-3">更新包裹狀態</h5>
+        <select id="newStatus" class="form-select mb-3">
+            <option value="運輸中">🚛 運輸中</option>
+            <option value="派送中">🏃 派送中 (即將抵達)</option>
+            <option value="抵達門口">🚪 已抵達門口/客廳</option>
+            <option value="卡住了">⚠️ 卡住了 (製造懸念)</option>
+        </select>
+        <input type="text" id="newLocation" class="form-control mb-3" placeholder="輸入目前位置 (例: 沙發轉運站)">
+        <button onclick="submitUpdate()" class="btn btn-primary w-100 mb-2">確認更新</button>
+        <button onclick="resetView()" class="btn btn-secondary w-100">取消</button>
+    </div>
+
+    <div id="signMode" class="d-none">
+        <h5 class="mb-2 text-center">請在此處簽名</h5>
+        <canvas id="signature-pad"></canvas>
+        <div class="d-flex gap-2 mt-2">
+            <button onclick="clearPad()" class="btn btn-secondary flex-grow-1">重寫</button>
+            <button onclick="submitSign()" class="btn btn-danger flex-grow-1">確認簽收</button>
+        </div>
+        <button onclick="resetView()" class="btn btn-link text-white-50 w-100 mt-2">取消</button>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const id = urlParams.get('id');
+        document.getElementById('displayId').innerText = id || '無單號';
+
+        // 簽名板設定
+        const canvas = document.getElementById('signature-pad');
+        const signaturePad = new SignaturePad(canvas, { backgroundColor: 'rgba(255, 255, 255, 0)' });
+        
+        function resizeCanvas() {
+            const ratio = Math.max(window.devicePixelRatio || 1, 1);
+            canvas.width = canvas.offsetWidth * ratio;
+            canvas.height = canvas.offsetHeight * ratio;
+            canvas.getContext("2d").scale(ratio, ratio);
+            signaturePad.clear();
+        }
+        window.addEventListener("resize", resizeCanvas);
+
+        // 讀取資料
+        if(id) {
+            fetch(`/api/track?id=${id}`).then(res => res.json()).then(data => {
+                if(data.error) {
+                    alert(data.error);
+                } else {
+                    document.getElementById('recipientName').innerText = `收件人：${data.recipient}`;
+                    document.getElementById('currentStatus').innerText = data.status;
+                }
+            });
+        } else {
+            alert("網址缺少 ID 參數");
+        }
+
+        function showUpdate() { toggle('menuMode', 'updateMode'); }
+        function showSign() { toggle('menuMode', 'signMode'); setTimeout(resizeCanvas, 100); } // 延遲確保渲染正確
+        function resetView() { 
+            document.getElementById('menuMode').classList.remove('d-none');
+            document.getElementById('updateMode').classList.add('d-none');
+            document.getElementById('signMode').classList.add('d-none');
+        }
+        function toggle(hide, show) {
+            document.getElementById(hide).classList.add('d-none');
+            document.getElementById(show).classList.remove('d-none');
+        }
+        function clearPad() { signaturePad.clear(); }
+
+        async function submitUpdate() {
+            const status = document.getElementById('newStatus').value;
+            const location = document.getElementById('newLocation').value;
+            if(!location) return alert("請輸入位置");
+            
+            await fetch('/api/track', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'update', id, status, location })
+            });
+            alert('更新成功！');
+            location.reload();
+        }
+
+        async function submitSign() {
+            if (signaturePad.isEmpty()) return alert("請先簽名");
+            const signature = signaturePad.toDataURL();
+            
+            await fetch('/api/track', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'sign', id, signature })
+            });
+            alert('🎉 簽收完成！');
+            window.location.href = `/index.html?id=${id}`;
+        }
+    </script>
+</body>
+</html>
